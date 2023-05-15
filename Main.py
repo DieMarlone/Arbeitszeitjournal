@@ -241,7 +241,7 @@ def print_logfile(num_days=None, start_date=None):
 
 
     # Prepare the repeated string parts
-    delimiter_line = "<" + "-"*135 + ">\n"
+    delimiter_line = "-"*118
     week_num_old = None
     week_start_date = None
     # Write selected data to output file
@@ -249,16 +249,22 @@ def print_logfile(num_days=None, start_date=None):
         for date_str, week_num, weekday in dates_to_display:
             # If new week, print week header
             if week_num != week_num_old:
-                output_file.write(f"<--------------------------------------------------------------Week {week_num}--------------------------------------------------------------->\n")
+                if week_num_old is not None:
+                    output_file.write(f"<{delimiter_line}>\n\n")
+                    
+                output_file.write(f"<-----------------------------------------------------------Week {week_num}---------------------------------------------------->\n")
                 week_num_old = week_num
+
             
             # Find corresponding entry in data
             for day in data:
                 if day[0] == date_str:
-                    output_file.write(f"Date: {day[0]:>10} {weekday:>10} | Start time: {day[1]:>5} to {day[2]:>5} | Total overtime: {day[3]:>5} | Pause: {day[4]:>3} Min | Extra minutes: {day[5]:>3}\n")
+                    output_file.write(f"|Date: {day[0]}: {weekday:>9} | Start time: {day[1]:>5} to {day[2]:>5} | Total overtime: {day[3]:>5} | Pause: {day[4]:>3} Min | Extra minutes: {day[5]:>3}|\n")
                     break  # Go to next date after finding matching entry
 
-        output_file.write(delimiter_line)
+        output_file.write(f"<{delimiter_line}>\n\n")
+        last_date = get_last_date_from_csv(Settings[1])
+        output_file.write(f"Total overtime: {get_over_hours_for_date(last_date, Settings)}\n")
     print("Logfile has been printed.")
 
 
@@ -316,7 +322,8 @@ while ans:
             print("wrong input try again")
     else:
         Settings = readSettings()
-        recalculate_over_hours()
+        if os.path.isfile(Settings[1]):
+            recalculate_over_hours()
 
 
         print("""
