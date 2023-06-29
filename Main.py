@@ -393,15 +393,5 @@ while ans:
 
 
 
-# Writing Data
-
-
-
-
-    # INIdatas = arbeitszeitenournalCreater(Arbeitszeit, ArbeitsTage)
-    # INIdatas.analyses()
-
-openfile()
-
 
 #todo halbtagsarbeit muss auch möglich sein
