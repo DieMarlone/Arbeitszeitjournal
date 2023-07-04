@@ -6,18 +6,20 @@ from datetime import date
 from datetime import datetime
 from datetime import timedelta
 import os
-import re
 import time
+from Settings import SettingsClass
+from datetime import datetime
+
 
 fieldnames = ['Date', 'Start', 'End', 'Over_hours', 'Pause', 'Extra_minutes']
-Settingsfile = "settings.ini"
+Settingsfile = "config/settings.ini"
 today = date.today()
 today = today.strftime("%d.%m.%Y")
 
 
 def createcsv(Settings):
 
-    with open(Settings[1], "w", encoding='UTF8', newline='') as f:
+    with open(Settings._dataBase, "w", encoding='UTF8', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
@@ -28,16 +30,22 @@ def readSettings():
         JornalAblageort = config.get(section, "datenbank")
         AblageOrtCookie = config.get(section, "printout")
         Arbeitstage = config.get(section, "arbeitstage")
-    return [int(Arbeitszeit), JornalAblageort, AblageOrtCookie, Arbeitstage]
+        defaultPause = config.get(section, "defaultPause")
+    Settings = SettingsClass(Arbeitszeit, Arbeitstage, JornalAblageort, AblageOrtCookie, defaultPause)
+    return Settings
 
-def calculate_over_hours(start: str, end: str, pause: str, Settings: list, extra_minutes: int = 0, previous_over_hours: str = "00:00"):
+def calculate_over_hours(weekday, start: str, end: str, pause: str, extra_minutes: int = 0, previous_over_hours: str = "00:00"):
     start_time = datetime.strptime(start, "%H:%M")
     end_time = datetime.strptime(end, "%H:%M")
     pause_time = timedelta(minutes=int(pause))
-    extra_time = timedelta(minutes=extra_minutes)
+    extra_time = timedelta(minutes=int(extra_minutes))
 
     duration = end_time - start_time - pause_time + extra_time
-    daily_working_hours = timedelta(hours=Settings[0])
+    if weekday not in Settings._workingDays:
+        workingTime = 0
+    else:
+        workingTime = Settings._workingTime
+    daily_working_hours = timedelta(hours=workingTime)
 
     daily_over_hours = duration - daily_working_hours
 
@@ -54,24 +62,31 @@ def calculate_over_hours(start: str, end: str, pause: str, Settings: list, extra
     # format hours and minutes with leading zeros
     return f"{hours:02d}:{minutes:02d}"
 
-from datetime import datetime
+
 
 def today_logging(date):
-    Settings = readSettings()
     date_as_date_objekt = datetime.strptime(date, "%d.%m.%Y")
     Weekday = date_as_date_objekt.strftime('%A')
     # Input is like start = 08:30 end = 18:00
     start = input(f"When did you start on {Weekday} HH:MM: ")
     end = input("When did you stop HH:MM: ")
-    pause = input("How long was your break Minutes: ")
-    extra_minutes = int(input("Did you work extra minutes? Minutes: "))
     
-    if not os.path.isfile(Settings[1]):
+    pause = input(f"How long was your break Minutes(default = {Settings._defaultPause} min): ")
+    extra_minutes = input("Did you work extra minutes? Minutes (Default = 0): ")
+    if pause == "":
+        pause = Settings._defaultPause
+    if extra_minutes == "":
+        extra_minutes = 0
+    else:
+        extra_minutes = int(extra_minutes)
+    
+    database = Settings._dataBase
+    if not os.path.isfile(database):
         print("No Database found")
         createcsv(Settings)
 
     rows = []
-    with open(Settings[1], 'r', encoding='UTF8') as f:
+    with open(database, 'r', encoding='UTF8') as f:
         reader = csv.DictReader(f)
         rows = list(reader)
 
@@ -81,7 +96,7 @@ def today_logging(date):
     else:
         previous_over_hours = "00:00"
 
-    over_hours = calculate_over_hours(start, end, pause, Settings, extra_minutes, previous_over_hours)
+    over_hours = calculate_over_hours(Weekday, start, end, pause, extra_minutes, previous_over_hours)
     
     new_row = {
         'Date': date,
@@ -108,24 +123,23 @@ def today_logging(date):
         rows.sort(key=lambda row: datetime.strptime(row['Date'], '%d.%m.%Y'))
 
         fieldnames = ['Date', 'Start', 'End', 'Over_hours', 'Pause', 'Extra_minutes']
-        with open(Settings[1], 'w', encoding='UTF8', newline='') as f:
+        with open(database, 'w', encoding='UTF8', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(rows)
     
 
-
-    
-#Log exctra hours worked on a day
+#Log extra hours worked on a day
 def addExtra(date: str, extra_minutes: int):
-    Settings = readSettings()
 
-    if not os.path.isfile(Settings[1]):
+    if not os.path.isfile(Settings._dataBase):
         print("No Database found")
         exit(RuntimeError)
 
+    date_as_date_objekt = datetime.strptime(date, "%d.%m.%Y")
+    Weekday = date_as_date_objekt.strftime('%A')
     rows = []
-    with open(Settings[1], 'r', encoding='UTF8') as f:
+    with open(Settings._dataBase, 'r', encoding='UTF8') as f:
         reader = csv.DictReader(f)
         rows = list(reader)
 
@@ -137,30 +151,29 @@ def addExtra(date: str, extra_minutes: int):
                 previous_over_hours = rows[i-1]['Over_hours']
             else:
                 previous_over_hours = "00:00"
-            row['Over_hours'] = calculate_over_hours(row['Start'], row['End'], row['Pause'], Settings, extra_minutes, previous_over_hours)
+            row['Over_hours'] = calculate_over_hours(Weekday, row['Start'], row['End'], row['Pause'], extra_minutes, previous_over_hours)
             break
 
     # update over_hours for the following days
     for i in range(rows.index(row) + 1, len(rows)):
         previous_over_hours = rows[i-1]['Over_hours']
-        rows[i]['Over_hours'] = calculate_over_hours(rows[i]['Start'], rows[i]['End'], rows[i]['Pause'], Settings, int(rows[i]['Extra_minutes']), previous_over_hours)
+        rows[i]['Over_hours'] = calculate_over_hours(Weekday, rows[i]['Start'], rows[i]['End'], rows[i]['Pause'], Settings, int(rows[i]['Extra_minutes']), previous_over_hours)
 
     fieldnames = ['Date', 'Start', 'End', 'Over_hours', 'Pause', 'Extra_minutes']
 
-    with open(Settings[1], 'w', encoding='UTF8', newline='') as f:
+    with open(Settings._dataBase, 'w', encoding='UTF8', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
 
 def recalculate_over_hours():
-    Settings = readSettings()
-
-    if not os.path.isfile(Settings[1]):
+    
+    if not os.path.isfile(Settings._dataBase):
         print("No Database found")
         exit(RuntimeError)
 
     rows = []
-    with open(Settings[1], 'r', encoding='UTF8') as f:
+    with open(Settings._dataBase, 'r', encoding='UTF8') as f:
         reader = csv.DictReader(f)
         rows = list(reader)
 
@@ -169,13 +182,15 @@ def recalculate_over_hours():
 
     # Recalculate over_hours for all days
     for i, row in enumerate(rows):
+        date_as_date_objekt = datetime.strptime(row["Date"], "%d.%m.%Y")
+        Weekday = date_as_date_objekt.strftime('%A')
         if i > 0:
             previous_over_hours = rows[i-1]['Over_hours']
-        row['Over_hours'] = calculate_over_hours(row['Start'], row['End'], row['Pause'], Settings, int(row['Extra_minutes']), previous_over_hours)
+        row['Over_hours'] = calculate_over_hours(Weekday, row['Start'], row['End'], row['Pause'], int(row['Extra_minutes']), previous_over_hours)
 
     fieldnames = ['Date', 'Start', 'End', 'Over_hours', 'Pause', 'Extra_minutes']
 
-    with open(Settings[1], 'w', encoding='UTF8', newline='') as f:
+    with open(Settings._dataBase, 'w', encoding='UTF8', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
@@ -268,12 +283,12 @@ def print_logfile(num_days=None, start_date=None):
     print("Logfile has been printed.")
 
 
-def get_over_hours_for_date(date: str, Settings: list):
+def get_over_hours_for_date(date: str, Settings: SettingsClass):
     # Convert date to datetime object for comparison
     date_object = datetime.strptime(date, "%d.%m.%Y")
 
     over_hours_for_date = None
-    with open(Settings[1], 'r') as file:
+    with open(Settings._dataBase, 'r') as file:
             database = csv.DictReader(file)
             for row in database:
                 row_date = datetime.strptime(row['Date'], "%d.%m.%Y")
@@ -288,21 +303,26 @@ def get_over_hours_for_date(date: str, Settings: list):
 
 def setSetting(config):
     Arbeitszeit = input("Working hours per day: ")
-    Arbeitstage = input("How many days do you work per week: ")
-    Datenbank = "Database.csv"
-    printout = input("What should your digital work time journal be named: ")
-
-    config.set("PARAMETERS", "Arbeitszeit", Arbeitszeit)
-    config.set("PARAMETERS", "Datenbank", Datenbank)
-    config.set("PARAMETERS", "printout", printout)
-    config.set("PARAMETERS", "Arbeitstage", Arbeitstage)
-    with open(Settingsfile, 'w') as configfile:
-        config.write(configfile)
-        configfile.close()
-
+    Arbeitstage = input("On which days you work in a week (Monday, Tuesday, Wednesday,...) Default Mon-Fri: ")
+    if Arbeitstage == "":
+        Arbeitstage = "Monday, Tuesday, Wednesday, Thursday, Friday"
+    else:
+        Arbeitstage = Arbeitstage.split(", ")
+    defaultPause = input("Default pause in minutes: ")
+    Datenbank = "config/Database.csv"
+    printout = input("What should your digital work time journal be named (Default database.csv): ")
+    if printout == "":
+        printout = "database.csv"
+    elif printout[-4:] != ".csv":
+        printout = printout + ".csv"
+    Settings = SettingsClass(Arbeitszeit, Arbeitstage, Datenbank, printout, defaultPause)
+    Settings.createSettingsfile()
+    return Settings
+    
 config = configparser.ConfigParser()
 config.read(Settingsfile)
 ans=True
+Settings = None
 while ans:
 
     if not os.path.isfile(Settingsfile):
@@ -313,16 +333,16 @@ while ans:
         """)
         Option = input("What would you like to do? ")
         if Option == "1":
-            config.add_section("PARAMETERS")
-            setSetting(config)
+            Settings: SettingsClass = setSetting(config)
  
         elif Option == "2":
             exit(1)
         else:
             print("wrong input try again")
     else:
-        Settings = readSettings()
-        if os.path.isfile(Settings[1]):
+        if not Settings:
+            Settings: SettingsClass = readSettings()
+        if os.path.isfile(Settings._dataBase):
             recalculate_over_hours()
 
 
@@ -350,12 +370,23 @@ while ans:
             extra_minutes = int(input("Wie viele Minuten sollen ergänzt werden? "))
             addExtra(date, extra_minutes)
         elif Option == "4":
-            date_str = input("Wann beginnt die Woche? DD.MM.YYYY: ")
+            date_str = input("Which Week? (Automatically the first working day of the week will be selected) DD.MM.YYYY: ")
             date = datetime.strptime(date_str, "%d.%m.%Y")
-            for i in range(int(Settings[3])):
+            
+            # Ermittle den Wochentag als Zahl (Montag = 0, Dienstag = 1, Mittwoch = 2, ...)
+            weekday = date.weekday()
+            
+            # Berechne die Anzahl der Tage, um zum ersten Arbeitstag zurückzugehen
+            days_to_subtract = (weekday) % len(Settings._workingDays)
+            
+            # Gehe entsprechend viele Tage zurück, um den ersten Arbeitstag zu erhalten
+            date -= timedelta(days=days_to_subtract)
+            
+            # Logging für jeden Arbeitstag der Woche durchführen
+            for _ in range(len(Settings._workingDays)):
                 date_str = date.strftime("%d.%m.%Y")
                 today_logging(date_str)
-                date = date + timedelta(days=1)
+                date += timedelta(days=1)
         elif Option == "5":
             start_date = input("Starting date (DD.MM.YYYY): ")
 
@@ -367,7 +398,7 @@ while ans:
             date = input("Welches Datum soll gellogt werden? DD.MM.YYYY: ")
             today_logging(date)
         elif Option == "8":
-            date = get_last_date_from_csv(Settings[1])
+            date = get_last_date_from_csv(Settings._dataBase)
             over_hours_for_date = get_over_hours_for_date(date, Settings)
             print(f"Over hours for {date}: {over_hours_for_date}")
             time.sleep(5)
