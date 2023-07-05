@@ -232,13 +232,11 @@ def get_date_range_from_csv(csv_file):
     return num_days
 
 def print_logfile(num_days=None, start_date=None):
-    # Read settings
-    Settings = readSettings()
 
     if num_days is None:
-        num_days = get_date_range_from_csv(Settings[1])
+        num_days = get_date_range_from_csv(Settings._dataBase)
     if start_date is None:
-        start_date = get_first_date_from_csv(Settings[1])
+        start_date = get_first_date_from_csv(Settings._dataBase)
     
     start_date = datetime.strptime(start_date, "%d.%m.%Y")
 
@@ -249,7 +247,7 @@ def print_logfile(num_days=None, start_date=None):
     dates_to_display = [(date.strftime('%d.%m.%Y'), date.isocalendar()[1], date.strftime('%A')) for date in dates_to_display]
 
     # Read data from CSV file and sort by date
-    with open(Settings[1], 'r') as file:
+    with open(Settings._dataBase, 'r') as file:
         data = csv.reader(file)
         next(data)  # Skip header row
         data = sorted(data, key=lambda row: datetime.strptime(row[0], "%d.%m.%Y"))
@@ -260,7 +258,7 @@ def print_logfile(num_days=None, start_date=None):
     week_num_old = None
     week_start_date = None
     # Write selected data to output file
-    with open(Settings[2], "w") as output_file:
+    with open(Settings._printout, "w") as output_file:
         for date_str, week_num, weekday in dates_to_display:
             # If new week, print week header
             if week_num != week_num_old:
@@ -278,11 +276,58 @@ def print_logfile(num_days=None, start_date=None):
                     break  # Go to next date after finding matching entry
 
         output_file.write(f"<{delimiter_line}>\n\n")
-        last_date = get_last_date_from_csv(Settings[1])
+        last_date = get_last_date_from_csv(Settings._dataBase)
         output_file.write(f"Total overtime: {get_over_hours_for_date(last_date, Settings)}\n")
     print("Logfile has been printed.")
+def create_graph(num_days=None, start_date=None):
+    import matplotlib.pyplot as plt
+    import csv
+    from datetime import datetime, timedelta
+
+    if num_days is None:
+        num_days = get_date_range_from_csv(Settings._dataBase)
+    if start_date is None:
+        start_date = get_first_date_from_csv(Settings._dataBase)
+    start_date = datetime.strptime(start_date, "%d.%m.%Y")
+    
+    # Calculate end date and create list of dates to be displayed
+    end_date = start_date + timedelta(days=num_days)
+    dates_to_display = [start_date + timedelta(days=x) for x in range((end_date - start_date).days)]
+    dates_to_display = [(date.strftime('%d.%m.%Y'), date.isocalendar()[1], date.strftime('%A')) for date in dates_to_display]
+
+    # Read data from CSV file and sort by date
+    with open(Settings._dataBase, 'r') as file:
+        data = csv.reader(file)
+        next(data)  # Skip header row
+        data = sorted(data, key=lambda row: datetime.strptime(row[0], "%d.%m.%Y"))
+        x = []
+        y = []
+        counter = 0
+        for row in data:
+            time_str = row[3]
+            time_float = 0.0
+            if time_str != '-':
+                if time_str.startswith('-'):
+                    time_str = time_str[1:]  # Remove the leading '-' character
+                    negative_sign = -1  # Set negative sign for negative hours
+                else:
+                    negative_sign = 1
+
+                hours, minutes = time_str.split(':')
+                time_float = float(hours) + float(minutes[:-1]) / 60.0
+                time_float *= negative_sign
+
+            x.append(counter)
+            y.append(time_float)
+            counter += 1
+        plt.plot(x, y)
+        plt.xlabel('Date')
+        plt.ylabel('Over Hours')
+        plt.title('Over Hours over Time')
+        plt.savefig('graph.png')
 
 
+    
 def get_over_hours_for_date(date: str, Settings: SettingsClass):
     # Convert date to datetime object for comparison
     date_object = datetime.strptime(date, "%d.%m.%Y")
@@ -310,11 +355,11 @@ def setSetting(config):
         Arbeitstage = Arbeitstage.split(", ")
     defaultPause = input("Default pause in minutes: ")
     Datenbank = "config/Database.csv"
-    printout = input("What should your digital work time journal be named (Default database.csv): ")
+    printout = input("What should your digital work time journal be named (Default Journal.txt): ")
     if printout == "":
-        printout = "database.csv"
-    elif printout[-4:] != ".csv":
-        printout = printout + ".csv"
+        printout = "Journal.txt"
+    elif printout[-4:] != ".txt":
+        printout = printout + ".txt"
     Settings = SettingsClass(Arbeitszeit, Arbeitstage, Datenbank, printout, defaultPause)
     Settings.createSettingsfile()
     return Settings
@@ -346,6 +391,7 @@ while ans:
             recalculate_over_hours()
 
 
+
         print("""
         1.Change Settings
         2.Log today
@@ -357,6 +403,7 @@ while ans:
         8.Print over hours left
         9.Print over hours for a specific date
         10.Exit/Quit
+        11.Create a graph
         """)
         Option = input("What would you like to do? ")
         if Option == "1":
@@ -413,7 +460,7 @@ while ans:
         elif Option == "10":
             exit(1)
         elif Option == "11":
-            recalculate_over_hours()
+            create_graph()
 
         else:
             print("wrong input try again")
