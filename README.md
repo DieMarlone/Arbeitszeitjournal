@@ -6,7 +6,7 @@ Stellen Sie sicher, dass Python installiert ist. Dieses Tool wurde mit Python 3.
 
 Installieren Sie die benötigten Python-Bibliotheken mit dem folgenden Befehl:
 
-```pip install datetime csv os configparser time```
+```pip install datetime csv os configparser time matplotlib```
 
 ## Verwendung
 Führen Sie das Python-Skript aus, indem Sie den folgenden Befehl in Ihrem Terminal eingeben:
