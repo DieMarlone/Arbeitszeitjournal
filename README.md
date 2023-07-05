@@ -1,28 +1,28 @@
-# Arbeitszeiterfassungs-Tool
-Dieses einfache Python-Tool erlaubt es Ihnen, Ihre täglichen Arbeitszeiten und Pausen zu erfassen, Überstunden zu berechnen und eine wöchentliche Zusammenfassung auszugeben. Es erstellt und aktualisiert eine Datenbank mit diesen Informationen.
+# Working Time Tracking Tool
+This simple Python tool allows you to record your daily working hours and breaks, calculate overtime and output a weekly summary. It creates and updates a database with this information.
 
 ## Installation
-Stellen Sie sicher, dass Python installiert ist. Dieses Tool wurde mit Python 3.9 entwickelt, aber es sollte mit jeder Python 3.x-Version funktionieren.
+Make sure that Python is installed. This tool was developed with Python 3.9, but it should work with any Python 3.x version.
 
-Installieren Sie die benötigten Python-Bibliotheken mit dem folgenden Befehl:
+Install the required Python libraries with the following command:
 
-```pip install datetime csv os configparser time matplotlib```
+``pip install datetime csv os configparser time matplotlib``
 
-## Verwendung
-Führen Sie das Python-Skript aus, indem Sie den folgenden Befehl in Ihrem Terminal eingeben:
+## Usage
+Run the Python script by entering the following command in your terminal:
 
-```python arbeitszeiterfassung.py```
+``python work-time-logging.py``.
 
-Folgen Sie den Anweisungen im Terminal, um Ihre Arbeitszeiten und Pausen einzugeben.
+Follow the instructions in the terminal to enter your working hours and breaks.
 
-## Anpassung
-Sie können die Parameter für die Arbeitszeiterfassung in der Konfigurationsdatei anpassen. Ändern Sie die Werte nach Ihren Bedürfnissen.
+## Customisation
+You can customise the working time recording parameters in the configuration file. Change the values according to your needs.
 
-## Unterstützung
-Wenn Sie Hilfe benötigen oder Fragen haben, erstellen Sie bitte ein Issue in diesem Repository.
+## Support
+If you need help or have questions, please create an issue in this repository.
 
-## Lizenz
-Dieses Projekt steht unter der MIT-Lizenz.
+## Licence
+This project is licensed under the MIT licence.
 
-## Haftungsausschluss
-Dieses Tool ist ein einfaches Skript zur Arbeitszeiterfassung und kann nicht alle speziellen Anforderungen abdecken. Es sollte nicht als vollständiges Zeiterfassungssystem für professionelle Zwecke verwendet werden. Es liegt in Ihrer Verantwortung, Ihre Arbeitszeiten korrekt zu erfassen und zu melden.
+## Disclaimer
+This tool is a simple time tracking script and may not cover all specific requirements. It should not be used as a complete time tracking system for professional purposes. It is your responsibility to record and report your working hours correctly.
