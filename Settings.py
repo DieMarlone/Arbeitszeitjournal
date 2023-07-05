@@ -1,5 +1,4 @@
 import configparser
-from os import mkdir
 import os
 
 
