@@ -11,7 +11,7 @@ Install the required Python libraries with the following command:
 ## Usage
 Run the Python script by entering the following command in your terminal:
 
-``python work-time-logging.py``.
+``python Main.py``.
 
 Follow the instructions in the terminal to enter your working hours and breaks.
 
