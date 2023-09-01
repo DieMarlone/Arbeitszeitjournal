@@ -8,11 +8,13 @@ from datetime import timedelta
 import os
 import time
 from Settings import SettingsClass
+from UserProfile import UserProfileClass
 from datetime import datetime
 
 
 fieldnames = ['Date', 'Start', 'End', 'Over_hours', 'Pause', 'Extra_minutes']
 Settingsfile = "config/settings.ini"
+UserProfileFile = "config/userProfile.ini"
 today = date.today()
 today = today.strftime("%d.%m.%Y")
 
@@ -30,9 +32,26 @@ def readSettings():
         JornalAblageort = config.get(section, "datenbank")
         AblageOrtCookie = config.get(section, "printout")
         Arbeitstage = config.get(section, "arbeitstage")
+        Arbeitstage = Arbeitstage.split(", ")
         defaultPause = config.get(section, "defaultPause")
     Settings = SettingsClass(Arbeitszeit, Arbeitstage, JornalAblageort, AblageOrtCookie, defaultPause)
     return Settings
+
+def readUserProfile():
+    userConfig = configparser.ConfigParser()
+    userConfig.read(UserProfileFile)
+    sections = userConfig.sections()
+    for section in sections:
+        firstName = userConfig.get(section, "firstName")
+        lastName = userConfig.get(section, "lastName")
+        email = userConfig.get(section, "email")
+        adress = userConfig.get(section, "adress")
+        postalCode = userConfig.get(section, "postalCode")
+        telephone = userConfig.get(section, "telephone")
+        city = userConfig.get(section, "city")
+    UserProfile = UserProfileClass(firstName, lastName, email, adress, postalCode, telephone, city)
+    return UserProfile
+
 
 def calculate_over_hours(weekday, start: str, end: str, pause: str, extra_minutes: int = 0, previous_over_hours: str = "00:00"):
     start_time = datetime.strptime(start, "%H:%M")
@@ -257,6 +276,10 @@ def print_logfile(num_days=None, start_date=None):
     delimiter_line = "-"*118
     week_num_old = None
     week_start_date = None
+
+    if not os.path.isfile(Settings._printout):
+        os.mkdir("printout")
+
     # Write selected data to output file
     with open(Settings._printout, "w") as output_file:
         for date_str, week_num, weekday in dates_to_display:
@@ -346,52 +369,127 @@ def get_over_hours_for_date(date: str, Settings: SettingsClass):
     return over_hours_for_date
 
 
-def setSetting(config):
+def setSetting():
     Arbeitszeit = input("Working hours per day: ")
     Arbeitstage = input("On which days you work in a week (Monday, Tuesday, Wednesday,...) Default Mon-Fri: ")
     if Arbeitstage == "":
         Arbeitstage = "Monday, Tuesday, Wednesday, Thursday, Friday"
     else:
         Arbeitstage = Arbeitstage.split(", ")
+    
     defaultPause = input("Default pause in minutes: ")
-    Datenbank = "config/Database.csv"
+    database = "config/Database.csv"
     printout = input("What should your digital work time journal be named (Default Journal.txt): ")
+
+    
+    # Check if printout ends with .txt
     if printout == "":
         printout = "Journal.txt"
     elif printout[-4:] != ".txt":
         printout = printout + ".txt"
-    Settings = SettingsClass(Arbeitszeit, Arbeitstage, Datenbank, printout, defaultPause)
+    printout = f"printout/{printout}"
+    
+    Settings = SettingsClass(Arbeitszeit, Arbeitstage, database, printout, defaultPause)
     Settings.createSettingsfile()
     return Settings
+
+def createUserProfile():
+    firstName = input("First name: ")
+    lastName = input("Last name: ")
+
+    email = input("Email: ")
+    while "@" not in email:
+        print("Please enter a valid email address\n")
+        email = input("Email: ")
     
+    adress = input("Adress: ")
+    postalCode = input("Postal code: ")
+    telephone = input("Telephone: ")
+    city = input("City: ")
+
+    UserProfile: UserProfileClass = UserProfileClass(firstName, lastName, email, adress, postalCode, telephone, city)
+    UserProfile.createProfile()
+    return UserProfile
+
+def createPDF():
+    import PyPDF2
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib import colors
+
+    pdfFileName = "Worktime_journal.pdf"
+    doc = SimpleDocTemplate(pdfFileName, pagesize=letter)
+    story = []
+
+    # Füge Benutzerdaten zum Story-Container hinzu
+    styles = getSampleStyleSheet()
+    Name = f"""{userProfile.firstName} {userProfile.lastName}"""
+    Adresse = f"""{userProfile.adress}"""
+    PostalCode = userProfile.postalCode + " " + userProfile.city
+    Tel = f"Tel: {userProfile.telephone}"
+    Mail = f"Mail: {userProfile.email}\n\n"
+
+    story.append(Paragraph("Work Time List", styles["Title"]))
+    story.append(Paragraph(Name, styles["Normal"]))
+    story.append(Paragraph(Adresse, styles["Normal"]))
+    story.append(Paragraph(PostalCode, styles["Normal"]))
+    story.append(Paragraph(Tel, styles["Normal"]))
+    story.append(Paragraph(Mail, styles["Normal"]))
+    story.append(Paragraph(" ", styles["Normal"]))
+
+    data = [fieldnames]  # Überschrift hinzufügen
+    
+    # Read data from CSV file and sort by date
+    with open(Settings._dataBase, 'r') as file:
+        readData = csv.reader(file)
+        next(readData)  # Skip header row
+        readData = sorted(readData, key=lambda row: datetime.strptime(row[0], "%d.%m.%Y"))
+   
+        data.extend(readData)  # Arbeitszeitdaten hinzufügen
+    
+    table = Table(data, colWidths=[100, 100, 100, 100, 50, 100])
+    table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                            ('GRID', (0, 0), (-1, -1), 1, colors.black)]))
+
+    story.append(table)
+
+    # Erstelle das PDF-Dokument mit dem Inhalt aus dem Story-Container
+    doc.build(story)
+
+    print(f"Das Arbeitszeitjournal wurde als '{pdfFileName}' gespeichert.")
+
+
 config = configparser.ConfigParser()
 config.read(Settingsfile)
-ans=True
 Settings = None
-while ans:
-
-    if not os.path.isfile(Settingsfile):
-
+while True:
+    if not os.path.isfile(Settingsfile) or not os.path.isfile(UserProfileFile):
         print("""
-        1.Set Settings
+        1.Set Settings and create a user Profile
         2.Exit/Quit
         """)
         Option = input("What would you like to do? ")
+        
         if Option == "1":
-            Settings: SettingsClass = setSetting(config)
- 
+            Settings: SettingsClass = setSetting()
+            userProfile: UserProfileClass = createUserProfile()
         elif Option == "2":
             exit(1)
         else:
             print("wrong input try again")
     else:
+        userProfile: UserProfileClass = readUserProfile()
         if not Settings:
             Settings: SettingsClass = readSettings()
         if os.path.isfile(Settings._dataBase):
             recalculate_over_hours()
-
-
-
+        
         print("""
         1.Change Settings
         2.Log today
@@ -404,15 +502,16 @@ while ans:
         9.Print over hours for a specific date
         10.Exit/Quit
         11.Create a graph
+        12.Create a user Profile for a personalises work time
+        13.Create a PDF	
         """)
         Option = input("What would you like to do? ")
         if Option == "1":
-            setSetting(config)
+            setSetting()
         elif Option == "2":
             date = today
             today_logging(date)
         elif Option == "3":
-
             date = input("Welches Datum soll ergänzt werden? DD.MM.YYYY: ")
             extra_minutes = int(input("Wie viele Minuten sollen ergänzt werden? "))
             addExtra(date, extra_minutes)
@@ -430,7 +529,8 @@ while ans:
             date -= timedelta(days=days_to_subtract)
             
             # Logging für jeden Arbeitstag der Woche durchführen
-            for _ in range(len(Settings._workingDays)):
+
+            for i in range(len(Settings.workingDays)):
                 date_str = date.strftime("%d.%m.%Y")
                 today_logging(date_str)
                 date += timedelta(days=1)
@@ -461,13 +561,24 @@ while ans:
             exit(1)
         elif Option == "11":
             create_graph()
-
+        elif Option == "12":
+            userProfile = createUserProfile()
+        elif Option == "13":
+            createPDF()
+       # elif Option == "14":
+       #     dateToBeLogged = input("Which date should be logged? DD.MM.YYYY (Default Todday): ")
+       #     if dateToBeLogged == '':
+       #         dateToBeLogged = today
+       #     oldSetting = Settings.workingTime
+       #     
+       #     workingHours = input("Changed Working Hours: ")
+       #     Settings.workingTime = int(workingHours)
+       #
+       #     today_logging(dateToBeLogged)
+       #     Settings.workingTime = oldSetting
         else:
             print("wrong input try again")
             time.sleep(10)
-
-
-
 
 
 
