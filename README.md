@@ -6,7 +6,7 @@ Make sure that Python is installed. This tool was developed with Python 3.9, but
 
 Install the required Python libraries with the following command:
 
-``pip install datetime csv os configparser time matplotlib``
+``pip install matplotlib PyPDF2 reportlab``
 
 ## Usage
 Run the Python script by entering the following command in your terminal:
